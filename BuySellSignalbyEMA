@@ -1,5 +1,5 @@
 //@version=4
-study(shorttitle="Buy/Sell Alert EMA and SuperFormula", title="Buy/Sell Alert EMA & Ichimoku + Bollinger with SuperFormula", overlay=true)
+study(shorttitle="Buy/Sell Alert EMA and SuperFormula", title="Buy/Sell Alert EMA & Ichimoku + Bollinger with SuperFormula by zdmre", overlay=true)
 
 /////////////////////EMA
 len = input(26, minval=1, title="Length")
