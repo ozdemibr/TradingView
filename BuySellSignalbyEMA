@@ -1,0 +1,84 @@
+//@version=4
+study(shorttitle="Buy/Sell Alert EMA and SuperFormula", title="Buy/Sell Alert EMA & Ichimoku + Bollinger with SuperFormula", overlay=true)
+
+/////////////////////EMA
+len = input(26, minval=1, title="Length")
+src = input(close, title="Source")
+out = ema(src, len)
+plot(out, title="EMA", color=#e0d700, linewidth=4)
+
+///////////////////// ICHIMOKU
+conversionPeriods = input(5, minval=1)
+basePeriods = input(26, minval=1)
+laggingSpan2Periods = input(52, minval=1),
+displacement = input(26, minval=1)
+donchian(len) => avg(lowest(len), highest(len))
+conversionLine = donchian(conversionPeriods)
+baseLine = donchian(basePeriods)
+leadLine1 = avg(conversionLine, baseLine)
+leadLine2 = donchian(laggingSpan2Periods)
+bottomcloud=leadLine2[displacement-1]
+uppercloud=leadLine1[displacement-1]
+kjuncol = conversionLine > baseLine ? color.blue : conversionLine < baseLine ? color.red : color.orange
+plot(conversionLine, color=color.purple, title="Conversion Line")
+plot(baseLine, color=kjuncol,linewidth=2,transp=5, title="Base Line")
+p1 = plot(leadLine1, offset = displacement  -1, color=color.green, title="Lead 1")
+p2 = plot(leadLine2, offset = displacement - 1, color=color.red, title="Lead 2")
+fill(p1, p2, color = leadLine1 > leadLine2 ? color.green : color.red, transp=40)
+
+///////////////////// HIGH AND LOW BAR
+newHigh = (high == highest(high, 30))
+newLow  = (low == lowest(low, 30))
+highText = "New " + "\n" + "high"
+lowText  = "New " + "\n" + "30-bar " + "\n" + "low"
+plotshape(series=newHigh, location=location.abovebar, style=shape.diamond, color=color.white, text=highText)
+plotshape(series=newLow, location=location.belowbar,style=shape.circle, color=color.purple, text=lowText)
+
+///////////////////// RSI & BOLLINGER
+RSIlength = input(6,title="RSI Period Length") 
+RSIoverSold = 50
+RSIoverBought = 50
+vrsi = rsi(close, RSIlength)
+
+BBlength = input(200, minval=1,title="Bollinger Period Length")
+BBmult = 2 // input(2.0, minval=0.001, maxval=50,title="Bollinger Bands Standard Deviation")
+BBbasis = sma(close, BBlength)
+BBdev = BBmult * stdev(close, BBlength)
+BBupper = BBbasis + BBdev
+BBlower = BBbasis - BBdev
+buyEntry = crossover(close, BBlower)
+sellEntry = crossunder(close, BBupper)
+plot(BBbasis, color=color.aqua,title="Bollinger Bands SMA Basis Line", linewidth=4)
+px = plot(BBupper, color=color.silver,title="Bollinger Bands Upper Line")
+py = plot(BBlower, color=color.silver,title="Bollinger Bands Lower Line")
+fill(px, py)
+
+switch1=input(true, title="Enable Bar Color?")
+switch2=input(true, title="Enable Background Color?")
+TrendColor = RSIoverBought and (close[1] > BBupper and close < BBupper) and BBbasis < BBbasis[1] ? color.red : RSIoverSold and (close[1] < BBlower and close > BBlower) and BBbasis > BBbasis[1] ? color.green : na
+barcolor(switch1?TrendColor:na)
+bgcolor(switch2?TrendColor:na,transp=50)
+
+///////////////////// FORMULA
+bearish = cross(close,out) == 1 and out > close
+bullish = cross(close,out) == 1 and out < close
+
+leftbars = input(1, minval=1, title='Bars to the left')
+rightbars = input(0, minval=1, title='Bars to the right')
+
+buyavg =   ((close+high)/2 - (high*(1-open/close)*(1-((low*open)/(high*close))))) 
+sellavg = (low+close)/1.99 + (low*(1-low/open)*(1-((low*open)/(close*high)))/1.1)
+
+if bullish
+    label1 = label.new(bar_index[rightbars], low[rightbars], text=("BUY: \n"+ tostring(buyavg)), style=label.style_labelup, color=#FFFF00)
+  
+if bearish
+    label2 = label.new(bar_index[rightbars], high[rightbars], text=("SELL: \n"+ tostring(sellavg)), style=label.style_labeldown, color=#8181F7)
+
+///////////////////// SIGNAL
+triggerAlert = if (bullish or bearish)
+    true
+else
+    false
+alertcondition(condition=triggerAlert, title='SIGNAL', message="Alarm Triggered")
+
