@@ -1,0 +1,125 @@
+//@version=4
+study(shorttitle="Buy/Sell Alert EMA and SuperFormula by zdmre", title="Buy/Sell Alert EMA & Ichimoku + Bollinger with SuperFormula by zdmre", overlay=true)
+
+/////////////////////EMA
+len = input(26, minval=1, title="Length")
+len2 = input(52, minval=1, title="Length52")
+src = input(close, title="Source")
+out = ema(src, len)
+out2=ema(src,len2)
+plot(out, title="EMA", color=#e0d700, linewidth=4)
+plot(out2, title="EMA2", color=#ffffff)
+///////////////////// ICHIMOKU
+conversionPeriods = input(5, minval=1)
+basePeriods = input(26, minval=1)
+laggingSpan2Periods = input(52, minval=1),
+displacement = input(26, minval=1)
+donchian(len) => avg(lowest(len), highest(len))
+conversionLine = donchian(conversionPeriods)
+baseLine = donchian(basePeriods)
+leadLine1 = avg(conversionLine, baseLine)
+leadLine2 = donchian(laggingSpan2Periods)
+bottomcloud=leadLine2[displacement-1]
+uppercloud=leadLine1[displacement-1]
+kjuncol = conversionLine > baseLine ? color.blue : conversionLine < baseLine ? color.red : color.orange
+plot(conversionLine, color=color.purple, title="Conversion Line")
+plot(baseLine, color=kjuncol,linewidth=2,transp=5, title="Base Line")
+p1 = plot(leadLine1, offset = displacement  -1, color=color.green, title="Lead 1")
+p2 = plot(leadLine2, offset = displacement - 1, color=color.red, title="Lead 2")
+fill(p1, p2, color = leadLine1 > leadLine2 ? color.green : color.red, transp=40)
+
+///////////////////// HIGH AND LOW BAR
+newHigh = (high == highest(high, 30))
+newLow  = (low == lowest(low, 30))
+highText = "New " + "\n" + "high"
+lowText  = "New " + "\n" + "30-bar " + "\n" + "low"
+plotshape(series=newHigh, location=location.abovebar, style=shape.diamond, color=color.white, text=highText)
+plotshape(series=newLow, location=location.belowbar,style=shape.circle, color=color.purple, text=lowText)
+
+///////////////////// RSI & BOLLINGER
+RSIlength = input(6,title="RSI Period Length") 
+RSIoverSold = 50
+RSIoverBought = 50
+vrsi = rsi(close, RSIlength)
+
+BBlength = input(200, minval=1,title="Bollinger Period Length")
+BBmult = 2 // input(2.0, minval=0.001, maxval=50,title="Bollinger Bands Standard Deviation")
+BBbasis = sma(close, BBlength)
+BBdev = BBmult * stdev(close, BBlength)
+BBupper = BBbasis + BBdev
+BBlower = BBbasis - BBdev
+buyEntry = crossover(close, BBlower)
+sellEntry = crossunder(close, BBupper)
+plot(BBbasis, color=color.aqua,title="Bollinger Bands SMA Basis Line", linewidth=4)
+px = plot(BBupper, color=color.silver,title="Bollinger Bands Upper Line")
+py = plot(BBlower, color=color.silver,title="Bollinger Bands Lower Line")
+fill(px, py)
+
+switch1=input(true, title="Enable Bar Color?")
+switch2=input(true, title="Enable Background Color?")
+TrendColor = RSIoverBought and (close[1] > BBupper and close < BBupper) and BBbasis < BBbasis[1] ? color.red : RSIoverSold and (close[1] < BBlower and close > BBlower) and BBbasis > BBbasis[1] ? color.green : na
+barcolor(switch1?TrendColor:na)
+bgcolor(switch2?TrendColor:na,transp=50)
+
+///////////////////// FORMULA
+bearish = cross(out2,out) == 1 and out < out2
+bullish = cross(out2,out) == 1 and out > out2
+
+leftbars = input(1, minval=1, title='Bars to the left')
+rightbars = input(0, minval=1, title='Bars to the right')
+
+buyavg =   ((close+high)/2 - (high*(1-open/close)*(1-((low*open)/(high*close))))) 
+sellavg = (low+close)/1.99 + (low*(1-low/open)*(1-((low*open)/(close*high)))/1.1)
+
+if bullish
+    label1 = label.new(bar_index[rightbars], low[rightbars]/1.02, text=("BUY: \n"+ tostring(buyavg)), style=label.style_labelup, color=#FFFF00)
+    label.set_size(label1, size.small)
+if bearish
+    label2 = label.new(bar_index[rightbars], high[rightbars]*1.02, text=("SELL: \n"+ tostring(sellavg)), style=label.style_labeldown, color=#8181F7)
+    label.set_size(label2, size.small)
+///////////////////// SIGNAL
+triggerAlert = if (bullish or bearish)
+    true
+else
+    false
+alertcondition(condition=triggerAlert, title='SIGNAL Alert', message="Price {{ticker}} = {{close}}")
+
+///////////////////// ISOLATED PEAK by Kivanc
+//izole dip - Isolated Bottom
+d02 = low
+d12 = low[1]
+izdip2 = low[2]
+d32 = low[3]
+d42 = low[4]
+h32 = high[3]
+h22 = high[2]
+
+//izole tepe - Isolated Peak
+t02 = high
+t12 = high[1]
+iztepe2 = high[2]
+t32 = high[3]
+t42 = high[4]
+L32 = low[3]
+L22 = low[2]
+
+izotepe1 = iff(iztepe2 > t02 and iztepe2 >= t12 and iztepe2 > t32 and iztepe2 > t42 and low[1] > min(L32, L22) and low < min(L32, L22), -1, na)
+izotepe2 = iff(t12 > t02 and t12 > iztepe2 and t12 > t32 and low < min(L22, low[1]), -2, na)
+
+izodip1 = iff(izdip2 < d02 and izdip2 < d12 and izdip2 < d32 and izdip2 < d42 and high[1] < max(h32, h22) and high > max(h32, h22), 1, na)
+izodip2 = iff(d12 < d02 and d12 < izdip2 and d12 < d32 and high > max(h22, high[1]), 1, na)
+
+buyavgiso =   ((close[1]+high[1])/2 - (high[1]*(1-open[1]/close[1])*(1-((low[1]*open[1])/(high[1]*close[1])))))
+sellavgiso = (low[1]+close[1])/1.99 + (low[1]*(1-low[1]/open[1])*(1-((low[1]*open[1])/(close[1]*high[1])))/1.1)
+if izodip1
+    label5 = label.new(bar_index[leftbars], low[leftbars]/1.08, text=("BOT1"), style=label.style_labelup, color=color.green)
+    label.set_size(label5, size.tiny)
+if izodip2
+    label6 = label.new(bar_index[leftbars], low[leftbars]/1.08, text=("BOT2"), style=label.style_labelup, color=color.green)
+    label.set_size(label6, size.tiny)
+if izotepe1
+    label7 = label.new(bar_index[leftbars], high[leftbars]*1.08, text=("PEAK1"), style=label.style_labeldown, color=color.red)
+    label.set_size(label7, size.tiny)
+if izotepe2
+    label8 = label.new(bar_index[leftbars], high[leftbars]*1.08, text=("PEAK2"), style=label.style_labeldown, color=color.red)
+    label.set_size(label8, size.tiny)
